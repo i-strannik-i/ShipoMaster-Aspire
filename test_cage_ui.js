@@ -1,0 +1,20 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const fields={};const document={addEventListener(){},getElementById(id){return fields[id]||=( {value:'',style:{}} );}};
+for(const [id,v] of Object.entries({CageWidth:600,CageDepth:500,CageHeight:1000,CageTubeA:20,CageTubeB:30,CageClearance:2,CageTrayHeight:40,CageShelves:1,CageShelfT:6,CagePartitions:0,CageShelfLevels:''}))document.getElementById(id).value=String(v);
+const context=vm.createContext({document,window:{setInterval(){}}});
+vm.runInContext(fs.readFileSync('cage_ui.js','utf8'),context);context.updateCagePreview();
+assert.ok(fields.cagePreview.innerHTML.includes('Клетка: ширина'));assert.ok(!/NaN|Infinity/.test(fields.cagePreview.innerHTML));
+assert.ok(fields.cagePreviewNote.textContent.includes('560 × 440'));
+fields.CageShelfLevels.value='400;750,5';fields.CageShelves.value='2';context.updateCagePreview();
+assert.ok(!/NaN|Infinity/.test(fields.cagePreview.innerHTML));
+const html=fs.readFileSync('ShipoMaster_Aspire.html','utf8');
+assert.ok(html.includes("tab('cage',this)"));assert.ok(html.includes('id="CageExport"'));assert.ok(html.includes("id==='cage'?'none'"));
+for(const id of ['CageCreate','CageExport'])assert.ok(html.includes('class="LuaButton" id="'+id+'"'),'Aspire requires exact LuaButton class');
+console.log('Cage preview and tab: passed.');
+
+assert.ok(fields.cagePreview.innerHTML.includes('Ширина X: 600 мм'));
+assert.ok(fields.cagePreview.innerHTML.includes('Длина Y: 500 мм'));
+assert.ok(fields.cagePreview.innerHTML.includes('Высота Z: 1000 мм'));
+context.chooseCagePdfPaper('A3');assert.equal(fields.CagePdfWidth.value,297);assert.equal(fields.CagePdfHeight.value,420);
+context.rotateCagePdfPaper();assert.equal(fields.CagePdfWidth.value,420);
+assert.ok(!html.includes('id="CageDoors"'));

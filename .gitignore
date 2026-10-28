@@ -1,0 +1,16 @@
+__pycache__/
+.venv/
+*.pyc
+build/
+bin/
+package/
+development/
+*.spec
+*.vgadget
+
+# Local generated previews and exports
+output/
+.env
+.env.*
+*.pem
+*.key
