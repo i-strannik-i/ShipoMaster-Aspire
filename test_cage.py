@@ -23,7 +23,7 @@ class CageGeometryTests(unittest.TestCase):
                     self.assertAlmostEqual(float(p.mediabox.width),width*72/25.4,places=3)
                     self.assertAlmostEqual(float(p.mediabox.height),height*72/25.4,places=3)
                 text='\n'.join(p.extract_text() for p in pdf.pages)
-                for word in ('Сборка','Узел X','Узел Y','Ведомость листовых деталей','Передняя панель без двери'):
+                for word in ('Сборка','Узел X','Узел Y','Спецификация сборочной единицы','Передняя панель без двери'):
                     self.assertIn(word,text)
                 for p in r['parts']:self.assertIn(p['name'].split('_')[0],text)
                 self.assertFalse(any(p['role']=='door' for p in r['parts']))
@@ -145,7 +145,7 @@ class CageGeometryTests(unittest.TestCase):
                 self.assertEqual(doc.units,4)
             pdf=PdfReader(folder/'cage_drawings.pdf')
             self.assertGreater(len(pdf.pages),len(r['cage']['tubes'])+len(r['parts'])//3)
-            self.assertIn('Разборная клетка',pdf.pages[0].extract_text())
+            self.assertIn('Сборочный чертёж',pdf.pages[0].extract_text())
             model=json.loads((folder/'cage_model.json').read_text(encoding='utf-8'))
             self.assertEqual(model['cage']['net_tube_length'],12000)
             tube=ezdxf.readfile(folder/'T01_tube.dxf')

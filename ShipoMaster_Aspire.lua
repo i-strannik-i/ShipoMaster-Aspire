@@ -1,8 +1,8 @@
 -- VECTRIC LUA SCRIPT
--- ShipoMaster Aspire 1.5.2 / Aspire 12.5
+-- ShipoMaster Aspire 1.5.3 / Aspire 12.5
 -- Geometry provenance is documented in README_RU.txt and the engine sources.
 
-local VERSION = '1.5.2'
+local VERSION = '1.5.3'
 local TITLE = 'ШипоМастер Aspire ' .. VERSION
 local script_dir = ''
 local number_defaults = {
