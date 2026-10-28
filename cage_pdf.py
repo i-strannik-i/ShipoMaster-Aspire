@@ -28,7 +28,7 @@ def world_point(part,u,v):
 
 
 def assembly_iso(result,exploded=False):
-    d=Drawing();o=result['options'];w=o['CageWidth'];dep=o['CageDepth'];h=o['CageHeight']
+    d=Drawing();o=result['cage']['options'];w=o['CageWidth'];dep=o['CageDepth'];h=o['CageHeight']
     def project(x,y,z):return .866025403784*(x-y),z+.5*(x+y)
     def segment(a,b,layer='OUTLINE'):d.line(*project(*a),*project(*b),layer)
     for m in result['cage']['members']:
@@ -58,7 +58,7 @@ def assembly_iso(result,exploded=False):
 
 
 def assembly_view(result,axis):
-    d=Drawing();o=result['options'];c=result['cage'];w=o['CageWidth'];dep=o['CageDepth'];h=o['CageHeight']
+    d=Drawing();o=result['cage']['options'];c=result['cage'];w=o['CageWidth'];dep=o['CageDepth'];h=o['CageHeight']
     if axis=='top':
         for m in c['members']:
             x,y,z=m['origin'];sx,sy,sz=m['size'];d.rect(x,y,sx,sy)
@@ -85,7 +85,7 @@ def assembly_view(result,axis):
 
 
 def joint_drawing(result,role):
-    d=Drawing();c=result['cage'];o=result['options']
+    d=Drawing();c=result['cage'];o=result['cage']['options']
     member=next(m for m in c['members'] if m['role']==role)
     pairs=zip(c['plates'],[p for p in result['parts'] if p['role'].startswith('corner_plate')])
     plate=next(p for connection,p in pairs if connection['member']==member['id'] and connection['end']==0)

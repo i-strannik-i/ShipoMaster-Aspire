@@ -1,8 +1,8 @@
 -- VECTRIC LUA SCRIPT
--- ShipoMaster Aspire 1.5.3 / Aspire 12.5
+-- ShipoMaster Aspire 1.5.4 / Aspire 12.5
 -- Geometry provenance is documented in README_RU.txt and the engine sources.
 
-local VERSION = '1.5.3'
+local VERSION = '1.5.4'
 local TITLE = 'ШипоМастер Aspire ' .. VERSION
 local script_dir = ''
 local number_defaults = {
@@ -274,6 +274,64 @@ local function add_vectors(result)
   return true,resized
 end
 
+local function box_signature(o)
+  local keys={};for k,_ in pairs(number_defaults) do keys[#keys+1]=k end
+  for k,_ in pairs(bool_defaults) do keys[#keys+1]=k end
+  for _,k in ipairs({'mode','count_mode','roof_mount'}) do keys[#keys+1]=k end
+  table.sort(keys);local values={}
+  for _,k in ipairs(keys) do
+    local v=o[k];local n=tonumber((tostring(v):gsub(',','.')))
+    values[#values+1]=k..'='..(n and string.format('%.8g',n) or tostring(v))
+  end
+  return table.concat(values,'|')
+end
+local function remember_box_layout(result,o)
+  local job=VectricJob();if not job.SheetManager then return end
+  local reg=Registry('ShipoMasterAssembly_1')
+  reg:SetString('sheet',tostring(job.SheetManager.ActiveSheetId))
+  reg:SetString('signature',box_signature(o))
+  for k,v in pairs({x=job.MinX,y=job.MinY,width=result.width,height=result.height}) do reg:SetString(k,tostring(v)) end
+end
+function OnLuaButton_BoxAssembly(dialog)
+  local o=read_fields(dialog);if not o then return true end
+  local job=VectricJob();local reg=Registry('ShipoMasterAssembly_1')
+  local same_sheet=reg:GetString('sheet','')==tostring(job.SheetManager.ActiveSheetId)
+  if same_sheet and reg:GetString('signature','')~=box_signature(o) then
+    MessageBox('Параметры изменены после создания деталей. Сначала создайте новую раскладку, затем сборочный чертёж.');return true
+  end
+  o.task='box_assembly';local result=calculate(o,nil,nil);if not result then return true end
+  local scale=job.InMM and 1 or 1/25.4;local gap=20*scale
+  local oldMinX,oldMinY,oldMaxX,oldMaxY=job.MinX,job.MinY,job.MinX+job.Width,job.MinY+job.Height
+  local baseX=same_sheet and tonumber(reg:GetString('x','')) or nil
+  local baseY=same_sheet and tonumber(reg:GetString('y','')) or nil
+  local right=baseX and baseX+(tonumber(reg:GetString('width','0')) or 0)*scale or oldMaxX
+  local dx=right+gap;local dy=baseY or oldMinY
+  if math.abs(oldMaxX)<.001 then dx=(baseX or oldMinX)-gap-result.width*scale end
+  if math.abs(oldMaxY)<.001 then dy=math.min(dy,-result.height*scale) end
+  local width=job.Width+2*math.max(0,dx+result.width*scale-oldMaxX,oldMinX-dx)
+  local height=job.Height+2*math.max(0,dy+result.height*scale-oldMaxY,oldMinY-dy)
+  if width>job.Width+.001 or height>job.Height+.001 then
+    job.SheetManager:ResizeSheet(job.SheetManager.ActiveSheetId,width,height,MaterialBlock().Thickness,false);job=VectricJob()
+    if job.Width+.001<width or job.Height+.001<height then MessageBox('Aspire не увеличил лист. Сборочный чертёж не добавлен.');return true end
+    if dx+result.width*scale>job.MinX+job.Width+.001 and math.abs(job.MinX+job.Width-oldMaxX)<.001 then dx=job.MinX+gap end
+    if dy+result.height*scale>job.MinY+job.Height+.001 and math.abs(job.MinY+job.Height-oldMaxY)<.001 then dy=job.MinY+gap end
+  end
+  if dx<job.MinX-.001 or dy<job.MinY-.001 or dx+result.width*scale>job.MinX+job.Width+.001 or dy+result.height*scale>job.MinY+job.Height+.001 then
+    MessageBox('Не удалось выделить место для сборочного чертежа на листе.');return true
+  end
+  local pending={}
+  for _,outline in ipairs(result.info.contours) do
+    local contour=Contour(0.0);contour:AppendPoint(Point2D(dx+outline.points[1][1]*scale,dy+outline.points[1][2]*scale))
+    for i=2,#outline.points do contour:LineTo(Point2D(dx+outline.points[i][1]*scale,dy+outline.points[i][2]*scale)) end
+    pending[#pending+1]=CreateCadContour(contour)
+  end
+  local layer=job.LayerManager:GetLayerWithName('INFO')
+  for _,object in ipairs(pending) do layer:AddObject(object,true) end
+  job:Refresh2DView()
+  dialog:UpdateLabelField('status','Сборочный чертёж добавлен рядом с раскладкой на слой INFO. Детали не дублируются; INFO не фрезеровать.')
+  return true
+end
+
 function OnLuaButton_Create(dialog)
   local o = read_fields(dialog)
   if not o then return true end
@@ -283,6 +341,7 @@ function OnLuaButton_Create(dialog)
   if not success then MessageBox('Ошибка добавления в Aspire: '..tostring(created));return true end
   if not created then return true end
   save_fields(o)
+  remember_box_layout(result,o)
   local status=string.format('Готово: %d деталей. Раскладка %.1f × %.1f мм.',#result.parts,result.width,result.height)
   if resized then status=status..resized end
   if result.joint_lock_count and result.joint_lock_count>0 then status=status..string.format(' Замки: %d; натяг %.2f мм.',result.joint_lock_count,tonumber((tostring(o.LockInterference):gsub(',','.'))) or 0.1) end

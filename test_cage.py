@@ -31,16 +31,33 @@ class CageGeometryTests(unittest.TestCase):
     def test_control_dimensions_lengths_and_saw(self):
         r=build({'task':'cage'});c=r['cage']
         self.assertEqual(len(c['members']),20)
-        self.assertEqual([(t['length'],t['quantity']) for t in c['tubes']],[(1000,1)]*4+[(560,4),(560,4),(440,4),(440,4)])
-        self.assertEqual(c['net_tube_length'],12000)
+        self.assertEqual([(t['length'],t['quantity']) for t in c['tubes']],[(997,1)]*4+[(532,4),(532,4),(412,4),(412,4)])
+        self.assertEqual(c['net_tube_length'],11540)
         self.assertEqual(c['saw_allowance'],60)
-        self.assertEqual(c['tube_with_saw'],12060)
-        self.assertEqual(c['finished_size'],[628,528,1003])
+        self.assertEqual(c['tube_with_saw'],11600)
+        self.assertEqual(c['finished_size'],[600,500,1000])
         top=next(p for p in r['parts'] if p['role']=='top')
-        self.assertEqual(top['origin'][2],1000)
-        self.assertEqual(c['tray']['width'],531)
-        self.assertEqual(c['tray']['depth'],436)
+        self.assertEqual(top['origin'][2],997)
+        self.assertEqual(c['tray']['width'],503)
+        self.assertEqual(c['tray']['depth'],408)
         self.assertEqual(len(c['plates']),32)
+
+    def test_dimensions_are_finished_outer_size_for_all_cladding_and_fasteners(self):
+        from cage_geometry import panel_offset
+        for thickness in (3,6,9):
+            for screws in (False,True):
+                r=build_cage({'CagePanelT':thickness,'CageTrayT':thickness,'cage_self_tap':screws})
+                c=r['cage'];o=c['options'];margin=panel_offset(o)+thickness
+                self.assertEqual(c['finished_size'],[600,500,1000])
+                self.assertEqual([r['options'][k] for k in ('CageWidth','CageDepth','CageHeight')],[600,500,1000])
+                self.assertEqual(c['frame_size'],[600-2*margin,500-2*margin,1000-thickness])
+                # Check actual assembled sheet extents, not just returned labels.
+                lows=[[],[],[]];highs=[[],[],[]]
+                for p in r['parts']:
+                    x,y,z=p['origin'];w,h,t=p['panel_width'],p['panel_height'],p['thickness']
+                    size=(w,h,t) if p['axes']=='XY' else (w,t,h) if p['axes']=='XZ' else (t,w,h)
+                    for axis,origin in enumerate((x,y,z)):lows[axis].append(origin);highs[axis].append(origin+size[axis])
+                self.assertEqual([max(highs[i])-min(lows[i]) for i in range(3)],[600,500,1000])
 
     def test_no_tube_intersections_except_touching_butt_ends(self):
         for opts in ({},{'CageWidth':300,'CageDepth':300,'CageHeight':800},
@@ -52,7 +69,7 @@ class CageGeometryTests(unittest.TestCase):
                     self.assertFalse(all(v>1e-7 for v in overlaps),(a,b))
 
     def test_lot_tray_clearances_and_nonintersecting_plates(self):
-        r=build_cage({});o=r['options'];c=r['cage'];tray=c['tray'];g=o['CageClearance']
+        r=build_cage({});c=r['cage'];o=c['options'];tray=c['tray'];g=o['CageClearance']
         self.assertAlmostEqual((o['CageWidth']-2*o['CageTubeA']-tray['width'])/2,o['CageGuide']+g)
         self.assertAlmostEqual(tray['origin'][2]+tray['height']+g,c['ring_tops'][1]-o['CageTubeB'])
         self.assertGreater(c['shelf_levels'][0]-o['CageTubeB'],c['ring_tops'][1]+o['CageShelfT'])
@@ -131,7 +148,7 @@ class CageGeometryTests(unittest.TestCase):
         r=build_cage({'CageWidth':'650,5','CageHeight':1100,'CageShelves':2,
                       'CageShelfLevels':'400;750,5','CageVentDiameter':8,'CageVentPitch':50})
         self.assertEqual(r['cage']['shelf_levels'],[400,750.5])
-        self.assertEqual(next(t for t in r['cage']['tubes'] if t['role']=='rail_x')['length'],610.5)
+        self.assertEqual(next(t for t in r['cage']['tubes'] if t['role']=='rail_x')['length'],582.5)
         self.assertTrue(all(len(p['contours'])>1 for p in r['parts'] if p['role']=='side'))
 
     def test_dxf_documents_pdf_and_manifest(self):
@@ -147,7 +164,7 @@ class CageGeometryTests(unittest.TestCase):
             self.assertGreater(len(pdf.pages),len(r['cage']['tubes'])+len(r['parts'])//3)
             self.assertIn('Сборочный чертёж',pdf.pages[0].extract_text())
             model=json.loads((folder/'cage_model.json').read_text(encoding='utf-8'))
-            self.assertEqual(model['cage']['net_tube_length'],12000)
+            self.assertEqual(model['cage']['net_tube_length'],11540)
             tube=ezdxf.readfile(folder/'T01_tube.dxf')
             self.assertEqual(len(list(tube.modelspace().query('CIRCLE'))),8)
             panel=ezdxf.readfile(next(folder.glob('C001_side*.dxf')))

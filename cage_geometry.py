@@ -47,7 +47,14 @@ def normalize_cage(raw):
 
 
 def build_cage(raw):
-    o=normalize_cage(raw)
+    outside=normalize_cage(raw)
+    o=outside.copy()
+    margin=panel_offset(o)+o['CagePanelT']
+    o['CageWidth']=outside['CageWidth']-2*margin
+    o['CageDepth']=outside['CageDepth']-2*margin
+    o['CageHeight']=outside['CageHeight']-o['CagePanelT']
+    if min(o['CageWidth'],o['CageDepth'],o['CageHeight'])<=0:
+        raise ValueError('Общий габарит слишком мал для обшивки и проставок.')
     W,D,H=(o[k] for k in ('CageWidth','CageDepth','CageHeight'))
     A,B=o['CageTubeA'],o['CageTubeB'];g=o['CageClearance']
     st,dt,pt=(o[k] for k in ('CageShelfT','CageDividerT','CagePanelT'))
@@ -156,10 +163,11 @@ def build_cage(raw):
         net_tube_length=net,saw_allowance=saw,tube_with_saw=net+saw,
         tray=dict(width=tw,depth=td,height=th,origin=[tx,ty,tz],opening_height=th+2*g),
         connection_note=CONNECTION_NOTE,assembly_notes=assembly_notes(o),plates=plates,
-        finished_size=[W+2*(panel_offset(o)+pt),D+2*(panel_offset(o)+pt),H+pt])
+        finished_size=[outside[k] for k in ('CageWidth','CageDepth','CageHeight')],frame_size=[W,D,H],outer_options=outside)
+    cage['dimension_basis']='finished_outer'
     cage['fasteners']=[dict(name='Self_tapping_screw' if o['cage_self_tap'] else 'M5_bolt',quantity=2*len(plates))]
     if not o['cage_self_tap']:cage['fasteners'].append(dict(name='M5_rivet_nut',quantity=2*len(plates)))
-    return dict(ok=True,version=VERSION,options=o,parts=parts,cage=cage,roof=None,
+    return dict(ok=True,version=VERSION,options=outside,parts=parts,cage=cage,roof=None,
         width=usedWidth,height=cy+rowHeight+10,
         thickness=max(p['thickness'] for p in parts),joint_lock_count=0)
 

@@ -4,7 +4,7 @@ for(const [id,v] of Object.entries({CageWidth:600,CageDepth:500,CageHeight:1000,
 const context=vm.createContext({document,window:{setInterval(){}}});
 vm.runInContext(fs.readFileSync('cage_ui.js','utf8'),context);context.updateCagePreview();
 assert.ok(fields.cagePreview.innerHTML.includes('Клетка: ширина'));assert.ok(!/NaN|Infinity/.test(fields.cagePreview.innerHTML));
-assert.ok(fields.cagePreviewNote.textContent.includes('560 × 440'));
+assert.ok(fields.cagePreviewNote.textContent.includes('532 × 412'));
 fields.CageShelfLevels.value='400;750,5';fields.CageShelves.value='2';context.updateCagePreview();
 assert.ok(!/NaN|Infinity/.test(fields.cagePreview.innerHTML));
 const html=fs.readFileSync('ShipoMaster_Aspire.html','utf8');

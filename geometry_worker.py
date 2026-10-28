@@ -1,4 +1,4 @@
-"""Standalone geometry engine for ShipoMaster Aspire 1.5.3.
+"""Standalone geometry engine for ShipoMaster Aspire 1.5.4.
 
 Adaptation of the supplied ShipoYashchik V2.01 formulas (Ulibka,
 Superbizon, alleks67, May 2015). No Corel installation or VBA required.
@@ -343,8 +343,12 @@ def main():
             result=check_update(VERSION) if opts['task']=='update_check' else download_update(VERSION)
         else:
             result=build(opts)
-            from layout_info import add_info
-            add_info(result,float(opts.get('info_sheet_width',0)),float(opts.get('info_sheet_height',0)))
+            if opts.get('task')=='box_assembly':
+                from box_assembly import build_box_assembly
+                result=build_box_assembly(result)
+            else:
+                from layout_info import add_info
+                add_info(result,float(opts.get('info_sheet_width',0)),float(opts.get('info_sheet_height',0)))
         if cage_export_dir:
             if not result.get('cage'):raise ValueError('Экспорт каркаса доступен только для клетки.')
             from cage_export import export_cage

@@ -32,6 +32,7 @@ class Paper:
   self.c.setTitle('Клетка - сборочные и рабочие чертежи');self.c.setAuthor('ШипоМастер Aspire')
   pdfmetrics.registerFont(TTFont('DraftArial',str(Path(os.environ.get('WINDIR','C:/Windows'))/'Fonts'/'arial.ttf')))
   geometry={k:v for k,v in self.o.items() if 'Pdf' not in k and k not in ('CageLayoutWidth','cage_pdf_only')}
+  geometry['dimension_basis']=result['cage'].get('dimension_basis','legacy_frame')
   self.code='SM.KL.'+hashlib.sha256(json.dumps(geometry,sort_keys=True).encode()).hexdigest()[:8].upper()
   self.left=20 if self.w>=200 else 10;self.right=self.w-5;self.width=self.right-self.left
   self.stamp=55 if self.width>=185 else 35;self.bottom=5+self.stamp+8;self.top=self.h-13;self.total=0;self.index=0;self.scales=[]
@@ -124,8 +125,10 @@ def render_drawing(p,d,area,draw=True):
  return v
 
 def ortho(p,r,axis,area,s):
- o=r['options'];w=o['CageWidth'];dep=o['CageDepth'];h=o['CageHeight'];extent=w if axis!='side' else dep
- v=View(p,(0,0,extent,dep if axis=='top' else h),area,s);seen=set()
+ o=r['cage']['options'];w=o['CageWidth'];dep=o['CageDepth'];h=o['CageHeight'];extent=w if axis!='side' else dep
+ margin=(r['cage']['finished_size'][0]-w)/2
+ bounds=(-margin,-margin if axis=='top' else 0,extent+margin,dep+margin if axis=='top' else r['cage']['finished_size'][2])
+ v=View(p,bounds,area,s);seen=set()
  for m in r['cage']['members']:
   x,y,z=m['origin'];sx,sy,sz=m['size']
   if axis=='front' and m['role']=='rail_y' or axis=='side' and m['role']=='rail_x':continue
@@ -135,14 +138,14 @@ def ortho(p,r,axis,area,s):
   if part['role'] not in ('floor','shelf','tray_base','divider','top'):continue
   x,y,z=part['origin'];u=part['panel_width'];vv=part['panel_height'];t=part['thickness'];sx,sy,sz=(u,vv,t) if part['axes']=='XY' else (u,t,vv) if part['axes']=='XZ' else (t,u,vv)
   if axis=='top':
-   if part['role']=='shelf':v.rect(x,y,sx,sy,'hidden')
+   if part['role'] in ('shelf','top'):v.rect(x,y,sx,sy,'hidden')
   else:v.rect(x if axis=='front' else y,z,sx if axis=='front' else sy,sz,'thin')
- x0,y0=v.point(0,0);X,Y=v.point(extent,dep if axis=='top' else h)
- p.dim_h(x0,X,y0,y0-10,number(extent));p.dim_v(y0,Y,X,X+10,number(dep if axis=='top' else h));return v
+ x0,y0=v.point(bounds[0],bounds[1]);X,Y=v.point(bounds[2],bounds[3])
+ p.dim_h(x0,X,y0,y0-10,number(bounds[2]-bounds[0]));p.dim_v(y0,Y,X,X+10,number(bounds[3]-bounds[1]));return v
 
 def assembly_sheet(p,r):
- o=r['options'];avail=p.top-p.bottom-12;upper=avail*.62;lower=avail-upper;left=p.left+8;w=p.width-18
- s=select_scale(max(o['CageWidth'],o['CageDepth']),o['CageHeight'],w*.46-8,upper-20)
+ o=r['cage']['options'];avail=p.top-p.bottom-12;upper=avail*.62;lower=avail-upper;left=p.left+8;w=p.width-18
+ s=select_scale(max(r['options']['CageWidth'],r['options']['CageDepth']),r['options']['CageHeight'],w*.46-8,upper-20)
  p.begin('Клетка. Сборочный чертёж',p.code+'.СБ',scale_name(s),'Разборный каркас; панели снаружи')
  a=(left,p.bottom+lower+8,w*.46,upper-20);b=(left+w*.53,p.bottom+lower+8,w*.43,upper-20)
  vf=ortho(p,r,'front',a,s);vs=ortho(p,r,'side',b,s)
@@ -150,7 +153,7 @@ def assembly_sheet(p,r):
  st=select_scale(o['CageWidth'],o['CageDepth'],w*.46-15,lower-20);ortho(p,r,'top',(left,p.bottom+8,w*.46,lower-20),st)
  p.text(left+w*.23,p.bottom+lower-4,'Вид сверху (М '+scale_name(st)+')',2.8,'center')
  y=p.bottom+lower-10;x=left+w*.54;tw=w*.45
- for text in ['Все размеры в миллиметрах.','Передняя и боковая обшивка условно снята для видимости каркаса и полок.','Наружный габарит: '+' × '.join(number(v) for v in r['cage']['finished_size'])+'.','Позиции - по спецификации. Уровни - от нижнего торца стойки.']:
+ for text in ['Все размеры в миллиметрах.','Передняя и боковая обшивка условно снята для видимости каркаса и полок.','Общий габарит: '+' × '.join(number(v) for v in r['cage']['finished_size'])+'. Каркас: '+' × '.join(number(v) for v in r['cage']['frame_size'])+'.','Позиции - по спецификации. Уровни - от нижнего торца стойки.']:
   y=p.wrap(x,y,text,tw,2.5,3.8)-2
  # Call out each selected type once; positions come from the same specification.
  members=[m for m in r['cage']['members'] if (m['role']=='post' and m['origin'][0]==0 and m['origin'][1]==0) or (m['role']=='rail_x' and m['origin'][1]==0)]
@@ -177,7 +180,7 @@ def iso_sheet(p,r,groups,exploded=False):
    m=next(m for m in r['cage']['members'] if m['id']==t['members'][0]);q=[m['origin'][i]+m['size'][i]/2 for i in range(3)];items.append((p.pos[t['id']],project(q),t['id']))
  else:
   from cage_pdf import world_point
-  o=r['options']
+  o=r['cage']['options']
   for g in groups:
    part=g[0]
    if part['role'].startswith('corner_plate'):continue
@@ -195,7 +198,7 @@ def iso_sheet(p,r,groups,exploded=False):
  p.text(p.left+3,p.bottom+6,'М '+scale_name(v.s)+'. Позиции на полках выносок; C - панели, T - типы труб.',2.5)
 
 def tube_sheet(p,r,t):
- o=r['options'];L=t['length'];a=o['CageTubeA'];b=o['CageTubeB'];s=select_scale(L,b,p.width-30,14);left=p.left+13
+ o=r['cage']['options'];L=t['length'];a=o['CageTubeA'];b=o['CageTubeB'];s=select_scale(L,b,p.width-30,14);left=p.left+13
  p.begin(t['id']+' - труба. Рабочий чертёж',p.code+'.'+t['id'],scale_name(s),f'Труба Al {number(a)}×{number(b)}×{number(o["CageTubeWall"])}')
  p.table(p.left+3,p.top-7,[p.width*.18,p.width*.31,p.width*.23,p.width*.24],[['Поз. / марка','Профиль, мм','Длина, мм','Количество'],[str(p.pos[t['id']])+' / '+t['id'],f'{number(a)}×{number(b)}×{number(o["CageTubeWall"])}',number(L),str(t['quantity'])]],font=2.5)
  y=p.top-40;step=21
@@ -268,7 +271,7 @@ def specification_rows(p,r,groups):
 def joint_sheet(p,r,role):
  label='Узел X' if role=='rail_x' else 'Узел Y';p.begin(label+' - крепление обвязки',p.code+'.'+label[-1],'по виду','Накладка; М5 / саморез по модели')
  from cage_export import Drawing
- o=r['options'];member=next(m for m in r['cage']['members'] if m['role']==role)
+ o=r['cage']['options'];member=next(m for m in r['cage']['members'] if m['role']==role)
  pairs=zip(r['cage']['plates'],[q for q in r['parts'] if q['role'].startswith('corner_plate')])
  plate=next(q for connection,q in pairs if connection['member']==member['id'] and connection['end']==0)
  side=role=='rail_y';a=o['CageTubeB'] if side else o['CageTubeA'];b=o['CageTubeB'];d=Drawing();d.rect(0,0,a,b+35);d.rect(a,0,o['CageHoleEnd']+40,b)
@@ -284,7 +287,7 @@ def joint_sheet(p,r,role):
  for i,(cx,cy) in enumerate(holes):
   xx,yy=v.point(cx,cy);p.line(xx-3,yy,xx+3,yy,'axis');p.line(xx,yy-3,xx,yy+3,'axis');p.dim_v(y0,yy,x0,x0-10-i*8,number(cy))
  if holes:p.leader(v.point(a/2,b*.15),p.left+5,p.top-20,'Поз. '+str(p.pos[plate['name'].split('_')[0]])+' - накладка')
- o=r['options'];yy=p.bottom+53
+ o=r['cage']['options'];yy=p.bottom+53
  for text in [label+'. Масштаб вида '+scale_name(v.s)+'.',r['cage']['connection_note'],f'Проход в накладке Ø{number(o["CageScrewDiameter"]+.3 if o["cage_self_tap"] else o["CageBoltHole"])}; труба Ø{number(o["CageScrewPilot"] if o["cage_self_tap"] else o["CageInsertHole"])}. Только наружная стенка.',f'Накладка s={number(o["CagePlateT"])}. Центр на поперечине от торца: {number(o["CageHoleEnd"])}.',f'Разнос осей стойки: {number(o["CageBoltStagger"])}. Координаты - на рабочих чертежах труб.', 'Панели снаружи через проставки. Трубы встык, торцы 90°; сварка не предусмотрена.']:
   yy=p.wrap(p.left+3,yy,text,p.width-6,2.5,4)-1
  if not r['options']['cage_self_tap']:
