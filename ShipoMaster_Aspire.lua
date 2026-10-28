@@ -1,8 +1,8 @@
 -- VECTRIC LUA SCRIPT
--- ShipoMaster Aspire 1.5.1 / Aspire 12.5
+-- ShipoMaster Aspire 1.5.2 / Aspire 12.5
 -- Geometry provenance is documented in README_RU.txt and the engine sources.
 
-local VERSION = '1.5.1'
+local VERSION = '1.5.2'
 local TITLE = 'ШипоМастер Aspire ' .. VERSION
 local script_dir = ''
 local number_defaults = {
@@ -158,6 +158,13 @@ end
 
 local function calculate(o, export_dir, dialog)
   -- All numeric inputs are in a data file; none is interpolated into a command.
+  if o.task~='update_check' and o.task~='update_download' then
+    local job=VectricJob()
+    if job.Exists and job.Width and job.Height then
+      local unit=job.InMM and 1 or 25.4
+      o.info_sheet_width=job.Width*unit;o.info_sheet_height=job.Height*unit
+    end
+  end
   local request = os.tmpname()
   local output = request .. '.lua'
   local file,err = io.open(request,'w')
@@ -249,11 +256,19 @@ local function add_vectors(result)
       pending[#pending+1] = {object=CreateCadContour(contour), layer=layer_name}
     end
   end
+  if result.info then
+    for _,outline in ipairs(result.info.contours) do
+      local contour=Contour(0.0)
+      contour:AppendPoint(Point2D(job.MinX+outline.points[1][1]*scale,job.MinY+outline.points[1][2]*scale))
+      for i=2,#outline.points do contour:LineTo(Point2D(job.MinX+outline.points[i][1]*scale,job.MinY+outline.points[i][2]*scale)) end
+      pending[#pending+1]={object=CreateCadContour(contour),layer='INFO',info=true}
+    end
+  end
   job.Selection:Clear()
   for _,entry in ipairs(pending) do
     local layer = job.LayerManager:GetLayerWithName(entry.layer)
     layer:AddObject(entry.object,true)
-    job.Selection:Add(entry.object,true,false)
+    if not entry.info then job.Selection:Add(entry.object,true,false) end
   end
   job:Refresh2DView()
   return true,resized
@@ -275,6 +290,7 @@ function OnLuaButton_Create(dialog)
     local c=result.roof.kerf
     status=status..string.format(' НЕСКВОЗНО с внутренней стороны: глубина %.3f мм, остаток %.3f мм; %d пропилов, шаг %.3f мм.',c.depth,c.remaining,c.count,c.pitch)
   end
+  if result.info then status=status..' Подписи и таблица: слой INFO (не фрезеровать).' end
   if result.roof then status=status..string.format(' Крышка: %.1f × %.1f мм; подъём %.1f мм.',result.roof.panel_length,result.roof.developed_length,result.roof.rise) end
   dialog:UpdateLabelField('status',status)
   return true
@@ -307,7 +323,7 @@ function OnLuaButton_CageCreate(dialog)
   if not success then MessageBox('Ошибка добавления клетки: '..tostring(created));return true end
   if not created then return true end
   save_cage(o)
-  local status=string.format('Готово: %d листовых деталей; %d труб. Чистый расход профиля %.1f мм.',#result.parts,#result.cage.members,result.cage.net_tube_length)..(resized or '')
+  local status=string.format('Готово: %d листовых деталей; %d труб. Чистый расход профиля %.1f мм.',#result.parts,#result.cage.members,result.cage.net_tube_length)..(resized or '')..' Подписи: слой INFO (не фрезеровать).'
   dialog:UpdateLabelField('cage_status',status)
   dialog:UpdateLabelField('status',status)
   return true
@@ -323,6 +339,23 @@ function OnLuaButton_CageExport(dialog)
   save_cage(o)
   dialog:UpdateLabelField('cage_status','Чертежи сохранены: '..(result.pdf_path or result.export_path))
   dialog:UpdateLabelField('status','Чертежи клетки сохранены: '..(result.pdf_path or result.export_path))
+  return true
+end
+
+function OnLuaButton_CheckUpdate(dialog)
+  local result=calculate({task='update_check'},nil,nil)
+  if result then
+    dialog:UpdateLabelField('about_update_status',result.message)
+    dialog:UpdateTextField('update_available',result.available and '1' or '0')
+  end
+  return true
+end
+function OnLuaButton_InstallUpdate(dialog)
+  local result=calculate({task='update_download'},nil,nil)
+  if result then
+    dialog:UpdateLabelField('about_update_status',result.message)
+    dialog:UpdateTextField('update_available','0')
+  end
   return true
 end
 
@@ -371,6 +404,8 @@ function main(path)
   dialog:AddTextField('cage_export_dir','')
   dialog:AddDirectoryPicker('ChooseCageExport','cage_export_dir',true)
   dialog:AddLabelField('cage_status','Задайте параметры клетки. Крепление: наружные плоские угловые накладки.')
+  dialog:AddTextField('update_available','0')
+  dialog:AddLabelField('about_update_status','При открытии About автоматически проверяется новая версия.')
   dialog:AddTextField('export_dir','')
   dialog:AddDirectoryPicker('ChooseExport','export_dir',true)
   dialog:AddLabelField('status','Задайте размеры и нажмите «Создать в Aspire». Все размеры — в мм.')

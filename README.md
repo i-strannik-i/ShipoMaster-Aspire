@@ -2,12 +2,12 @@
 
 Гаджет для **Vectric Aspire 12.5 под Windows x64**: шипованные ящики, перегородки, гибкие прорези, изогнутые крышки и клетка с разборным алюминиевым каркасом.
 
-**Текущая версия: 1.5.1.** Проверено в Aspire **12.504**. Совместимость с другими версиями Aspire и с VCarve не проверялась.
+**Текущая версия: 1.5.2.** Проверено в Aspire **12.504**. Совместимость с другими версиями Aspire и с VCarve не проверялась.
 
 ## Скачать и установить
 
 1. Откройте [последний релиз](https://github.com/i-strannik-i/ShipoMaster-Aspire/releases/latest).
-2. В разделе **Assets** скачайте **`ShipoMaster_Aspire_1.5.1.vgadget`**. Архивы **Source code** предназначены для разработчиков.
+2. В разделе **Assets** скачайте **`ShipoMaster_Aspire_1.5.2.vgadget`**. Архивы **Source code** предназначены для разработчиков.
 3. В Aspire выберите **Gadgets → Install New Gadget…** и укажите скачанный `.vgadget`.
 4. Создайте или откройте проект и задайте толщину материала в **Job Setup → Thickness (Z)**.
 5. Запустите **Gadgets → ShipoMaster Aspire → ShipoMaster Aspire**. Если пункт не появился, закройте и снова откройте Aspire.
@@ -59,11 +59,12 @@ python -m venv .venv
 .venv\Scripts\python -m unittest discover -p "test_*.py"
 node test_preview.js
 node test_cage_ui.js
+node test_dialog_ui.js
 .venv\Scripts\python -m PyInstaller --noconfirm --onefile --noconsole --name ShipoMasterEngine --distpath bin --workpath build geometry_worker.py
 .venv\Scripts\python package_gadget.py
 ```
 
-Готовый файл появится в корне проекта: `ShipoMaster_Aspire_1.5.1.vgadget`. Флаг `--install` у `package_gadget.py` дополнительно копирует пакет в общую папку гаджетов Aspire 12.5. Для смены версии используется `bump_version.py`.
+Готовый файл появится в корне проекта: `ShipoMaster_Aspire_1.5.2.vgadget`. Флаг `--install` у `package_gadget.py` дополнительно копирует пакет в общую папку гаджетов Aspire 12.5. Для смены версии используется `bump_version.py`.
 
 Результаты проверок и сведения о проверках в Aspire: [VERIFICATION_RU.txt](VERIFICATION_RU.txt).
 
@@ -74,3 +75,8 @@ node test_cage_ui.js
 Готовый пакет содержит Python и сторонние библиотеки. Их лицензионные уведомления находятся в папке **LICENSES** внутри `.vgadget`. Vectric Aspire в поставку не входит.
 
 Сообщения об ошибках: [Issues](https://github.com/i-strannik-i/ShipoMaster-Aspire/issues). Приложите версию Aspire, режим, входные размеры и скриншот результата.
+
+
+Обновления: при открытии About автоматически проверяется новая версия. Вход и регистрация на GitHub не требуются. Кнопка «Обновить» скачивает пакет, проверяет SHA-256 и открывает папку с ним. Завершите установку в Aspire через Gadgets → Install New Gadget… Обратная связь: strannik.rvs@yandex.ru.
+
+Подписи раскладки: отдельный слой INFO, номера на деталях и таблица названий с габаритами по внешнему контуру (Ш × Д × Т, мм). Размер текста подбирается для A4 с учётом текущего листа. При печати включите INFO и масштабирование под страницу. Слой INFO не фрезеровать; он не входит в автоматическое выделение контуров обработки. Для таблицы при необходимости увеличивается лист. На мелких деталях номера меньше; полные названия и размеры остаются в таблице.

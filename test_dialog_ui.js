@@ -1,0 +1,11 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const nodes={bottomDock:{offsetHeight:210},update_available:{value:'0'},InstallUpdate:{style:{}},about_update_status:{},CheckUpdate:{click(){checks++}}};
+let checks=0;const page={style:{}},body={style:{}},header={offsetHeight:110},tabs={offsetHeight:40};
+const document={documentElement:{clientHeight:790},addEventListener(){},getElementById(id){return nodes[id]},getElementsByClassName(name){return ({header:[header],body:[body],tabs:[tabs],page:[page]})[name]}};
+const context=vm.createContext({document,window:{setInterval(){},setTimeout(fn){fn()}}});vm.runInContext(fs.readFileSync('dialog_ui.js','utf8'),context);
+context.resizeDialogLayout();const h=parseFloat(page.style.height);document.documentElement.clientHeight=1100;context.resizeDialogLayout();assert.equal(parseFloat(page.style.height)-h,310);
+nodes.bottomDock.offsetHeight=360;context.resizeDialogLayout();assert.equal(parseFloat(page.style.height),h+160);
+context.checkVersionOnAbout();context.checkVersionOnAbout();assert.equal(checks,1);
+context.refreshUpdateButton();assert.equal(nodes.InstallUpdate.style.display,'none');nodes.update_available.value='1';context.refreshUpdateButton();assert.equal(nodes.InstallUpdate.style.display,'inline-block');
+const html=fs.readFileSync('ShipoMaster_Aspire.html','utf8');assert.ok(html.indexOf('id="cageActions"')>html.indexOf('id="bottomDock"'));assert.ok(html.includes('bottom:18px'));assert.ok(!html.includes('height:425px'));assert.ok(html.includes('mailto:strannik.rvs@yandex.ru'));for(const id of ['CheckUpdate','InstallUpdate'])assert.ok(html.includes('class="LuaButton" id="'+id+'"'));
+console.log('Dialog resize, bottom dock and update controls: passed.');

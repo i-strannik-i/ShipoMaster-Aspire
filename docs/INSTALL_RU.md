@@ -1,4 +1,4 @@
-# Установка ШипоМастер Aspire 1.5.1
+# Установка ШипоМастер Aspire 1.5.2
 
 ## Совместимость
 
@@ -9,7 +9,7 @@
 
 ## Обычная установка
 
-1. Скачайте `ShipoMaster_Aspire_1.5.1.vgadget` из [Releases](https://github.com/i-strannik-i/ShipoMaster-Aspire/releases/latest), раздел **Assets**.
+1. Скачайте `ShipoMaster_Aspire_1.5.2.vgadget` из [Releases](https://github.com/i-strannik-i/ShipoMaster-Aspire/releases/latest), раздел **Assets**.
 2. Сохраните файл с расширением `.vgadget`. Не выбирайте архив Source code для обычной установки.
 3. В Aspire откройте **Gadgets → Install New Gadget…**.
 4. Выберите файл `.vgadget` и дождитесь установки.
@@ -29,7 +29,7 @@
 C:\Users\Public\Documents\Vectric Files\Gadgets\Aspire V12.5\
 ```
 
-В результате файлы `ShipoMaster_Aspire.lua`, `ShipoMaster_Aspire.html`, `preview.js`, `cage_ui.js`, папки `assets` и `__runtime` должны находиться внутри одной папки `ShipoMaster Aspire`. Исполняемый движок расположен в `__runtime\ShipoMasterEngine.exe`.
+В результате файлы `ShipoMaster_Aspire.lua`, `ShipoMaster_Aspire.html`, `preview.js`, `cage_ui.js`, `dialog_ui.js`, папки `assets` и `__runtime` должны находиться внутри одной папки `ShipoMaster Aspire`. Исполняемый движок расположен в `__runtime\ShipoMasterEngine.exe`.
 
 3. Перезапустите Aspire и запустите гаджет через меню Gadgets.
 
@@ -48,7 +48,7 @@ C:\Users\Public\Documents\Vectric Files\Gadgets\Aspire V12.5\
 
 Кнопка **«Сохранить единый PDF»** создаёт новый каталог внутри выбранной папки. По умолчанию сохраняется один PDF на страницах A4. Можно выбрать A3/A2/A1, повернуть страницу или указать свои размеры. Чертежи масштабируются под страницу; это не печатные шаблоны 1:1. При отключении «Только PDF» дополнительно сохраняются DXF/CSV/JSON.
 
-Двери в версии 1.5.1 не предусмотрены. Подробные настройки и ограничения описаны в [README](../README.md) и [README_RU.txt](../README_RU.txt).
+Двери в версии 1.5.2 не предусмотрены. Подробные настройки и ограничения описаны в [README](../README.md) и [README_RU.txt](../README_RU.txt).
 
 ## Если не запускается
 
@@ -56,3 +56,6 @@ C:\Users\Public\Documents\Vectric Files\Gadgets\Aspire V12.5\
 - Проверьте наличие `__runtime\ShipoMasterEngine.exe` и остальных файлов; одиночного Lua-файла недостаточно.
 - Если Windows или антивирус сообщил об ошибке, сохраните точный текст и укажите его в [Issues](https://github.com/i-strannik-i/ShipoMaster-Aspire/issues).
 - Для отчёта также нужны версия Aspire, параметры, режим и скриншот.
+
+
+Обновления: при открытии About автоматически проверяется новая версия. Вход и регистрация на GitHub не требуются. Кнопка «Обновить» скачивает пакет, проверяет SHA-256 и открывает папку с ним. Завершите установку в Aspire через Gadgets → Install New Gadget… Обратная связь: strannik.rvs@yandex.ru.
