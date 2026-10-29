@@ -25,6 +25,13 @@ class Sheet:
   for x,y in (a,b):self.line((x-1,y-1),(x+1,y+1))
   if vertical:self.text(a[0]+2,(a[1]+b[1])/2,str(value),2.6)
   else:self.text((a[0]+b[0])/2,a[1]-5,str(value),2.6,True)
+ def callout(self,label,anchor,x,y):
+  h=3.2;self.text(x,y,label,h)
+  end=(x+width(label,h)/2,y-1)
+  elbow=(end[0],anchor[1])
+  self.path([anchor,elbow,end])
+  self.line((x,y-1),(x+width(label,h),y-1))
+  ax,ay=anchor;self.path([(ax-.45,ay),(ax,ay+.45),(ax+.45,ay),(ax,ay-.45),(ax-.45,ay)],True)
 
 def fmt(v):return f'{v:.1f}'.rstrip('0').rstrip('.')
 def rectangle(w,h):return [(0,0),(w,0),(w,h),(0,h),(0,0)]
@@ -55,6 +62,8 @@ def build_box_assembly(result):
  elif mode==6:
   p=result['parts'][0];front=[c['points'] for c in p['contours']];side=[rectangle(L,bt)]
  p,bounds=fit_path(s,front,(17,174,71,73));s.text(53,254,'ТОРЕЦ / ВИД СПЕРЕДИ',2.6,True);a=p(min(x for path in front for x,y in path),min(y for path in front for x,y in path));s.dim((a[0],a[1]-6),(a[0]+bounds[0]*min(71/bounds[0],73/bounds[1]),a[1]-6),fmt(bounds[0]))
+ front_ids=[part['name'].split('_')[0] for part in result['parts'] if part['role']=='arch_end' or part['name'].startswith(('001_','005_'))]
+ s.text(53,201,', '.join(front_ids),3.2,True)
  p,bounds=fit_path(s,side,(119,174,67,73));s.text(153,254,'ВИД СБОКУ',2.6,True);a=p(0,0);z=p(0,bounds[1]);s.dim((a[0]-6,a[1]),(a[0]-6,z[1]),fmt(bounds[1]),True)
  # Axonometric schematic with the actual roof arc; dimensions are on orthogonal views.
  def P(x,y,z):return (.866025403784*(x-y),z+.5*(x+y))
@@ -81,7 +90,26 @@ def build_box_assembly(result):
  if mode==5:
   profile=front[0];paths=[[P(x,y,z) for x,z in profile] for y in (0,W)]
   for i in range(0,len(profile),5):x,z=profile[i];paths.append([P(x,0,z),P(x,W,z)])
- fit_path(s,paths,(16,87,91,63));s.text(61,156,'АКСОНОМЕТРИЯ (СХЕМА)',2.6,True)
+ iso,_=fit_path(s,paths,(24,91,68,55));s.text(61,156,'АКСОНОМЕТРИЯ (СХЕМА)',2.6,True)
+ # Use the SAME identifiers as the cut layout, with leaders terminating on each part.
+ targets=[];divider_index=0
+ bottom=o['SmeshenieDno']+bt if mode in (2,3,7) or mode==8 and o['bottom_in_grooves'] else bt
+ for part in result['parts']:
+  ident=part['name'].split('_')[0];role=part['role'];number=int(ident)
+  if role=='bottom':xyz=(L*.5,W*.5,bt if mode==6 else bottom)
+  elif role=='lid':xyz=(L*.5,W*.5,fullH)
+  elif role=='divider':
+   nl=int(o['KolPeregorodokPoDline']);nw=int(o['KolPeregorodokPoShirine']);divider_index+=1
+   xyz=(L*divider_index/(nl+1),W*.5,bottom+min(o['VisotaPeregorodok'],H-bottom)*.6) if divider_index<=nl else (L*.5,W*(divider_index-nl)/(nw+1),bottom+min(o['VisotaPeregorodok'],H-bottom)*.6)
+  elif number in (1,5):xyz=(0 if number==1 else L,W*.5,H*.55)
+  else:xyz=(L*.5,0 if number==2 else W,H*.6)
+  targets.append(dict(part=part['name'],id=ident,anchor=iso(*P(*xyz))))
+ # Split leaders on either side of the view; arrange their labels top to bottom.
+ ordered=sorted(targets,key=lambda c:c['anchor'][0]);middle=(len(ordered)+1)//2
+ for column,x in ((ordered[:middle],8),(ordered[middle:],100)):
+  for i,c in enumerate(sorted(column,key=lambda c:-c['anchor'][1])):
+   y=143-i*min(15,49/max(1,len(column)-1));c['label_position']=(x,y)
+   s.callout(c['id'],c['anchor'],x,y)
  y=149;notes=[f'Стенки {fmt(t)} мм; дно / крышка {fmt(bt)} мм.','Размеры натуральные, в миллиметрах.','Шипы и прорези на схеме условные. Точные контуры - в раскладке.']
  if roof:
   notes=[f'R внутренний {fmt(roof["radius"])} мм.',f'Полная высота торца {fmt(fullH)} мм.','Крыша: закрытые пазы и фиксаторы.' if roof['mount']=='overlay' else 'Крыша: шипы в закрытых пазах торцов.']+notes
@@ -98,4 +126,6 @@ def build_box_assembly(result):
  # Match the diagram's size to the existing layout, preserving shape proportions.
  factor=max(1,result['height']/297,result['width']/450)
  for c in s.contours:c['points']=[[round(x*factor,5),round(y*factor,5)] for x,y in c['points']]
- return {'ok':True,'version':result['version'],'parts':[],'width':210*factor,'height':297*factor,'thickness':result['thickness'],'info':{'layer':'INFO','contours':s.contours,'texts':s.texts,'assembly':True,'source_parts':[p['name'] for p in result['parts']]}}
+ for c in targets:
+  for key in ('anchor','label_position'):c[key]=[round(v*factor,5) for v in c[key]]
+ return {'ok':True,'version':result['version'],'parts':[],'width':210*factor,'height':297*factor,'thickness':result['thickness'],'info':{'layer':'INFO','contours':s.contours,'texts':s.texts,'callouts':targets,'assembly':True,'source_parts':[p['name'] for p in result['parts']]}}

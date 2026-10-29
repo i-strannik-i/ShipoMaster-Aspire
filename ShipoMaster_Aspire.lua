@@ -1,10 +1,11 @@
 -- VECTRIC LUA SCRIPT
--- ShipoMaster Aspire 1.5.7 / Aspire 12.5
+-- ShipoMaster Aspire 1.5.8 / Aspire 12.5
 -- Geometry provenance is documented in README_RU.txt and the engine sources.
 
-local VERSION = '1.5.7'
+local VERSION = '1.5.8'
 local TITLE = 'ШипоМастер Aspire ' .. VERSION
 local script_dir = ''
+local settings_saved = false
 local number_defaults = {
   shirina=100, dlinna=200, visota=100, dFreza=4, dMaterial=9,
   DMaterialDna=9, Zazor=0.2, LockInterference=0.1, DlinaShipa=20, KolPoVisote=3,
@@ -114,13 +115,9 @@ local function smart_joints(dialog,o)
   return true
 end
 
-local function read_fields(dialog,force_auto)
-  local thickness = project_thickness()
-  if not thickness then return nil end
+local function field_values(dialog)
   local o = {}
   for k,_ in pairs(number_defaults) do o[k] = dialog:GetTextField(k) end
-  o.dMaterial = thickness
-  dialog:UpdateTextField('dMaterial',tostring(thickness))
   for k,_ in pairs(bool_defaults) do o[k] = dialog:GetCheckBox(k) end
   o.mode = 2
   local selected = dialog:GetDropDownListValue('mode')
@@ -128,6 +125,14 @@ local function read_fields(dialog,force_auto)
   o.count_mode = dialog:GetDropDownListValue('count_mode') == joints[2] and 1 or 0
   o.roof_mount = 0
   for i,value in ipairs(roof_mounts) do if dialog:GetDropDownListValue('roof_mount')==value then o.roof_mount=i-1 end end
+  return o
+end
+local function read_fields(dialog,force_auto)
+  local thickness = project_thickness()
+  if not thickness then return nil end
+  local o = field_values(dialog)
+  o.dMaterial = thickness
+  dialog:UpdateTextField('dMaterial',tostring(thickness))
   if o.mode==8 then
     if o.radius_auto then
       local width=tonumber((tostring(o.shirina):gsub(',','.')))
@@ -149,7 +154,11 @@ end
 
 local function save_fields(o)
   local reg = Registry('ShipoMasterAspire_1')
-  for k,_ in pairs(number_defaults) do if k ~= 'dMaterial' then reg:SetString(k,tostring(o[k])) end end
+  for k,_ in pairs(number_defaults) do
+    local project_value=k=='dMaterial' or k=='DMaterialDna' and o.bottom_same or
+      k=='TolshinaPeregorodok' and o.divider_same or k=='RoofThickness' and o.roof_same
+    if not project_value then reg:SetString(k,tostring(o[k])) end
+  end
   for k,_ in pairs(bool_defaults) do reg:SetBool(k,o[k]) end
   reg:SetInt('mode',o.mode)
   reg:SetInt('count_mode',o.count_mode)
@@ -216,20 +225,30 @@ function OnLuaButton_Tool6(dialog) return choose_cutter(dialog,6) end
 local function machining_layer(outline, thickness, stock)
   local name
   if outline.operation == 'blind_kerf' then
-    return 'On_' .. outline.layer
+    return ('ON_' .. outline.layer):upper()
   elseif outline.operation == 'drill' then
     name = 'DRILL'
   elseif not outline.closed then
-    name = 'On'
+    name = 'ON'
   elseif outline.hole then
-    name = 'In'
+    name = 'IN'
   else
-    name = 'out'
+    name = 'OUT'
   end
   if thickness and math.abs(thickness-stock) > 0.001 then
-    name = name .. '_T_' .. string.format('%.4g',thickness) .. 'mm'
+    name = name .. '_T_' .. string.format('%.4g',thickness) .. 'MM'
   end
   return name
+end
+
+local function set_machining_colour(layer,name)
+  -- SDK COLORREF = red + 256*green + 65536*blue (not HTML RGB order).
+  local colour=0
+  if name=='OUT' or name:match('^OUT_T_') then colour=16711680 -- #0000ff
+  elseif name=='IN' or name:match('^IN_T_') then colour=16776960 -- #00ffff
+  elseif name=='ON' or name:match('^ON_') then colour=32768 -- #008000
+  elseif name=='DRILL' or name:match('^DRILL_T_') then colour=33023 end -- #ff8000
+  layer.Colour=colour
 end
 
 local function add_vectors(result)
@@ -284,8 +303,13 @@ local function add_vectors(result)
     end
   end
   job.Selection:Clear()
+  local layers={}
   for _,entry in ipairs(pending) do
-    local layer = job.LayerManager:GetLayerWithName(entry.layer)
+    local layer = layers[entry.layer]
+    if not layer then
+      layer=job.LayerManager:GetLayerWithName(entry.layer)
+      layer.Name=entry.layer;set_machining_colour(layer,entry.layer);layers[entry.layer]=layer
+    end
     layer:AddObject(entry.object,true)
     if not entry.info then job.Selection:Add(entry.object,true,false) end
   end
@@ -351,6 +375,8 @@ function OnLuaButton_BoxAssembly(dialog)
     pending[#pending+1]=CreateCadContour(contour)
   end
   local layer=job.LayerManager:GetLayerWithName('INFO')
+  layer.Name='INFO'
+  set_machining_colour(layer,'INFO')
   for _,object in ipairs(pending) do layer:AddObject(object,true) end
   job:Refresh2DView()
   dialog:UpdateLabelField('status','Сборочный чертёж добавлен рядом с раскладкой на слой INFO. Детали не дублируются; INFO не фрезеровать.')
@@ -394,9 +420,23 @@ local function read_cage(dialog)
 end
 local function save_cage(o)
   local reg=Registry('ShipoMasterCage_1')
-  for k,_ in pairs(cage_defaults) do reg:SetString(k,tostring(o[k])) end
+  for k,_ in pairs(cage_defaults) do
+    if k~='CagePanelT' and k~='CageTrayT' then reg:SetString(k,tostring(o[k])) end
+  end
   reg:SetBool('cage_self_tap',o.cage_self_tap)
   reg:SetBool('cage_pdf_only',o.cage_pdf_only)
+end
+function OnLuaButton_SaveSettings(dialog)
+  -- Save UI values without running geometry, changing joint counts or validating a job.
+  save_fields(field_values(dialog))
+  local o={}
+  for k,_ in pairs(cage_defaults) do o[k]=dialog:GetTextField(k) end
+  o.cage_self_tap=dialog:GetCheckBox('cage_self_tap')
+  o.cage_pdf_only=dialog:GetCheckBox('cage_pdf_only')
+  save_cage(o)
+  Registry('ShipoMasterCage_1'):SetString('cage_export_dir',dialog:GetTextField('cage_export_dir'))
+  settings_saved=true
+  return true
 end
 function OnLuaButton_CageCreate(dialog)
   local o=read_cage(dialog)
@@ -485,7 +525,7 @@ function main(path)
   for k,v in pairs(cage_defaults) do dialog:AddTextField(k,(k=='CagePanelT' or k=='CageTrayT') and tostring(thickness) or cage_reg:GetString(k,tostring(v))) end
   dialog:AddCheckBox('cage_self_tap',cage_reg:GetBool('cage_self_tap',false))
   dialog:AddCheckBox('cage_pdf_only',cage_reg:GetBool('cage_pdf_only',true))
-  dialog:AddTextField('cage_export_dir','')
+  dialog:AddTextField('cage_export_dir',cage_reg:GetString('cage_export_dir',''))
   dialog:AddDirectoryPicker('ChooseCageExport','cage_export_dir',true)
   dialog:AddLabelField('cage_status','Задайте параметры клетки. Крепление: наружные плоские угловые накладки.')
   dialog:AddTextField('update_available','0')
@@ -496,6 +536,9 @@ function main(path)
   dialog:AddLabelField('joint_summary','Автоматический подбор учитывает толщину материала, фрезу и габариты.')
   dialog:AddLabelField('tool_status','Ваши фрезы: 2, 3, 4, 6 мм. Основная — 4 мм. Перед созданием выполняется проверка.')
   read_fields(dialog)
-  dialog:ShowDialog()
+  settings_saved=false
+  local accepted=dialog:ShowDialog()
+  -- A Cancel/title-X may discard HTML values: preserve an already saved snapshot.
+  if accepted or not settings_saved then OnLuaButton_SaveSettings(dialog) end
   return true
 end

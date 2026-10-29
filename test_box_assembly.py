@@ -10,6 +10,11 @@ class BoxAssemblyTests(unittest.TestCase):
     original=build({'mode':mode,'roof_mount':mount,'dMaterial':4,'dFreza':4})
     r=build_box_assembly(original);self.assertEqual(r['parts'],[]);self.assertTrue(r['info']['assembly'])
     self.assertEqual(r['info']['source_parts'],[p['name'] for p in original['parts']])
+    self.assertEqual([c['part'] for c in r['info']['callouts']],r['info']['source_parts'])
+    for c in r['info']['callouts']:
+     self.assertIn(c['id'],r['info']['texts'])
+     for key in ('anchor','label_position'):
+      x,y=c[key];self.assertTrue(0<=x<=r['width'] and 0<=y<=r['height'])
     for c in r['info']['contours']:
      for x,y in c['points']:self.assertTrue(-.001<=x<=r['width']+.001 and -.001<=y<=r['height']+.001,(mode,x,y,r['width'],r['height']))
  def test_native_adds_only_info_and_preserves_existing_objects_and_selection(self):

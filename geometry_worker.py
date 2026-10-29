@@ -1,4 +1,4 @@
-"""Standalone geometry engine for ShipoMaster Aspire 1.5.7.
+"""Standalone geometry engine for ShipoMaster Aspire 1.5.8.
 
 Adaptation of the supplied ShipoYashchik V2.01 formulas (Ulibka,
 Superbizon, alleks67, May 2015). No Corel installation or VBA required.

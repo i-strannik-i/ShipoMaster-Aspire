@@ -9,3 +9,12 @@ context.checkVersionOnAbout();context.checkVersionOnAbout();assert.equal(checks,
 context.refreshUpdateButton();assert.equal(nodes.InstallUpdate.style.display,'none');nodes.update_available.value='1';context.refreshUpdateButton();assert.equal(nodes.InstallUpdate.style.display,'inline-block');
 const html=fs.readFileSync('ShipoMaster_Aspire.html','utf8');assert.ok(html.indexOf('id="cageActions"')>html.indexOf('id="bottomDock"'));assert.ok(html.includes('bottom:18px'));assert.ok(!html.includes('height:425px'));assert.ok(html.includes('mailto:strannik.rvs@yandex.ru'));for(const id of ['CheckUpdate','InstallUpdate'])assert.ok(html.includes('class="LuaButton" id="'+id+'"'));
 console.log('Dialog resize, bottom dock and update controls: passed.');
+
+// Save the final value after rapid edits; clicking the hidden callback must not loop.
+const pending=new Map(),events={};let timer=0,saves=0;
+const saveDocument={...document,addEventListener(name,fn){events[name]=fn},getElementById(id){return id==='SaveSettings'?{click(){saves++;events.click({target:{id:'SaveSettings'}})}}:nodes[id]}};
+const saveContext=vm.createContext({document:saveDocument,window:{setInterval(){},setTimeout(fn){pending.set(++timer,fn);return timer},clearTimeout(id){pending.delete(id)}}});
+vm.runInContext(fs.readFileSync('dialog_ui.js','utf8'),saveContext);
+events.input({target:{id:'shirina'}});events.change({target:{id:'joint_locks'}});assert.equal(pending.size,1);
+const run=[...pending.values()][0];pending.clear();run();assert.equal(saves,1);assert.equal(pending.size,0);
+console.log('Settings debounce and callback recursion guard: passed.');

@@ -167,7 +167,7 @@ class ProjectSettingsTests(unittest.TestCase):
         """)
         l.globals().OnLuaButton_Create(l.globals().dialog)
         layers=list(l.globals().native_layers.values())
-        self.assertTrue(any('KERF_INSIDE_DEPTH_3.4000mm_REMAIN_0.6000mm' in name for name in layers))
+        self.assertTrue(any('KERF_INSIDE_DEPTH_3.4000MM_REMAIN_0.6000MM' in name for name in layers))
         self.assertFalse(any('HINGE_CUTS' in name for name in layers))
         self.assertIn('глубина 3.400',l.globals().labels.status)
 
@@ -175,13 +175,15 @@ class ProjectSettingsTests(unittest.TestCase):
         l=self.resize_runtime(5000,5000,in_mm=in_mm)
         l.globals().engine_result=l.execute('return '+lua(result))
         l.execute('''
-          native_layers={};selected=0
+          native_layers={};native_colours={};selected=0
           function VectricJob() return {Exists=true,InMM=metric,Width=5000,Height=5000,MinX=0,MinY=0,
             LayerManager={GetLayerWithName=function(self,name)
-              table.insert(native_layers,name);return {AddObject=function() end} end},
+              local layer={};layer.AddObject=function()
+                table.insert(native_layers,name);native_colours[name]=layer.Colour end;return layer end},
             Selection={Clear=function() end,Add=function() selected=selected+1 end},Refresh2DView=function() end} end
         ''')
         l.globals().OnLuaButton_Create(l.globals().dialog)
+        self.last_capture_runtime=l
         return list(l.globals().native_layers.values()),l.globals().selected
 
     def test_native_layers_route_all_box_modes_by_machining_side(self):
@@ -192,12 +194,12 @@ class ProjectSettingsTests(unittest.TestCase):
                 expected=[]
                 for part in result['parts']:
                     for c in part['contours']:
-                        name='On' if not c['closed'] else 'In' if c['hole'] else 'out'
-                        if abs(part['thickness']-6)>.001:name+=f"_T_{part['thickness']:.4g}mm"
+                        name='ON' if not c['closed'] else 'IN' if c['hole'] else 'OUT'
+                        if abs(part['thickness']-6)>.001:name+=f"_T_{part['thickness']:.4g}MM"
                         expected.append(name)
                 self.assertEqual(actual,expected)
                 self.assertEqual(selected,len(expected))
-                self.assertIn('out',actual)
+                self.assertIn('OUT',actual)
 
     def test_native_layers_keep_depth_drilling_and_other_thickness_separate(self):
         points=[[0,0],[10,0],[10,10],[0,0]]
@@ -211,13 +213,17 @@ class ProjectSettingsTests(unittest.TestCase):
             dict(name='b',thickness=3,contours=[dict(closed=True,hole=False,points=points)])],
             info=dict(contours=[dict(points=points)]))
         layers,selected=self.capture_layers(result)
-        self.assertEqual(layers,['out','In','On','DRILL',
-            'On_KERF_INSIDE_DEPTH_5.0000mm_REMAIN_1.0000mm','out_T_3mm','INFO'])
+        self.assertEqual(layers,['OUT','IN','ON','DRILL',
+            'ON_KERF_INSIDE_DEPTH_5.0000MM_REMAIN_1.0000MM','OUT_T_3MM','INFO'])
+        colours=dict(self.last_capture_runtime.globals().native_colours.items())
+        self.assertEqual(colours,{'OUT':0xff0000,'IN':0xffff00,'ON':0x008000,
+            'DRILL':0x0080ff,'ON_KERF_INSIDE_DEPTH_5.0000MM_REMAIN_1.0000MM':0x008000,
+            'OUT_T_3MM':0xff0000,'INFO':0})
         self.assertEqual(selected,6)
         # Stock is .25 inches = 6.35 mm; base layers must use the actual stock units.
         result['parts'][0]['thickness']=6.35
         layers,_=self.capture_layers(result,in_mm=False)
-        self.assertEqual(layers[:4],['out','In','On','DRILL'])
+        self.assertEqual(layers[:4],['OUT','IN','ON','DRILL'])
 
     def test_native_cage_drilling_is_not_merged_into_profile_holes(self):
         result=build(dict(task='cage',dMaterial=6))
@@ -225,12 +231,81 @@ class ProjectSettingsTests(unittest.TestCase):
         expected=[]
         for part in result['parts']:
             for c in part['contours']:
-                name='DRILL' if c.get('operation')=='drill' else 'In' if c['hole'] else 'out'
-                if abs(part['thickness']-6)>.001:name+=f"_T_{part['thickness']:.4g}mm"
+                name='DRILL' if c.get('operation')=='drill' else 'IN' if c['hole'] else 'OUT'
+                if abs(part['thickness']-6)>.001:name+=f"_T_{part['thickness']:.4g}MM"
                 expected.append(name)
         self.assertTrue(any(name.startswith('DRILL') for name in expected))
         self.assertEqual(actual,expected)
         self.assertEqual(selected,len(expected))
+
+    def test_settings_saved_on_cancel_without_creation_and_stock_is_not_persisted(self):
+        l=self.runtime()
+        l.execute('''
+          saved={};opens=0
+          function Registry(name)
+            local function get(self,k,d) local v=saved[name..':'..k];if v==nil then return d end;return v end
+            local function set(self,k,v) saved[name..':'..k]=v end
+            return {GetString=get,GetBool=get,GetInt=get,SetString=set,SetBool=set,SetInt=set}
+          end
+          old_dialog=HTML_Dialog
+          function HTML_Dialog(...)
+            local d=old_dialog(...)
+            d.ShowDialog=function(self)
+              dialog=self;opens=opens+1
+              if opens==1 then
+                fields.shirina='234';fields.dFreza='3';checks.auto_joints=false
+                lists.mode='Изогнутая крышка';checks.joint_locks=false
+                fields.CageShelfT='9';fields.CageWidth='700'
+                fields.cage_export_dir='C:/Cage drawings';checks.cage_pdf_only=false
+              end
+              return false
+            end
+            return d
+          end
+        ''')
+        l.globals().main('unused')
+        self.assertEqual(l.globals().saved['ShipoMasterAspire_1:shirina'],'234')
+        for key in ('ShipoMasterAspire_1:dMaterial','ShipoMasterCage_1:CagePanelT','ShipoMasterCage_1:CageTrayT'):
+            self.assertIsNone(l.globals().saved[key])
+        l.globals().stock=8
+        l.globals().main('unused')
+        self.assertEqual(l.globals().fields.shirina,'234')
+        self.assertEqual(l.globals().fields.dFreza,'3')
+        self.assertFalse(l.globals().checks.joint_locks)
+        self.assertFalse(l.globals().checks.cage_pdf_only)
+        self.assertEqual(l.globals().fields.CageWidth,'700')
+        self.assertEqual(l.globals().fields.CageShelfT,'9')
+        self.assertEqual(l.globals().fields.cage_export_dir,'C:/Cage drawings')
+        for key in ('dMaterial','DMaterialDna','CagePanelT','CageTrayT'):
+            self.assertEqual(float(l.globals().fields[key]),8)
+
+    def test_existing_uppercase_layers_are_reused_on_repeated_creation(self):
+        l=self.resize_runtime(5000,5000)
+        l.execute('''
+          layer_store={};new_layers=0;existing_added=0
+          for _,name in ipairs({'OUT','IN','ON','INFO'}) do
+            layer_store[name]={original=true,AddObject=function() existing_added=existing_added+1 end}
+          end
+          old_job=VectricJob
+          function VectricJob()
+            local j=old_job()
+            j.LayerManager.GetLayerWithName=function(self,name)
+              if not layer_store[name] then new_layers=new_layers+1;error('Unexpected layer: '..name) end
+              return layer_store[name]
+            end
+            return j
+          end
+        ''')
+        result=dict(ok=True,width=100,height=100,thickness=6,parts=[dict(name='test',thickness=6,contours=[
+            dict(closed=True,hole=False,points=[[0,0],[10,0],[0,0]]),
+            dict(closed=True,hole=True,points=[[1,1],[2,1],[1,1]]),
+            dict(closed=False,points=[[3,3],[4,4]])])],info=dict(contours=[dict(points=[[5,5],[6,6]])]))
+        l.execute('engine_result='+lua(result))
+        for _ in range(2):l.globals().OnLuaButton_Create(l.globals().dialog)
+        self.assertEqual(l.globals().new_layers,0)
+        self.assertEqual(l.globals().existing_added,8)
+        self.assertEqual(l.globals().layer_store.OUT.Name,'OUT')
+        self.assertEqual(l.globals().layer_store.OUT.Colour,0xff0000)
 
     def test_missing_job_requires_setup(self):
         l=self.runtime();l.execute('has_job=false')
