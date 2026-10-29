@@ -1,8 +1,8 @@
 -- VECTRIC LUA SCRIPT
--- ShipoMaster Aspire 1.5.4 / Aspire 12.5
+-- ShipoMaster Aspire 1.5.5 / Aspire 12.5
 -- Geometry provenance is documented in README_RU.txt and the engine sources.
 
-local VERSION = '1.5.4'
+local VERSION = '1.5.5'
 local TITLE = 'ШипоМастер Aspire ' .. VERSION
 local script_dir = ''
 local number_defaults = {
@@ -212,6 +212,26 @@ function OnLuaButton_Tool3(dialog) return choose_cutter(dialog,3) end
 function OnLuaButton_Tool4(dialog) return choose_cutter(dialog,4) end
 function OnLuaButton_Tool6(dialog) return choose_cutter(dialog,6) end
 
+-- Native Aspire layers describe the machining side, not the part name.
+local function machining_layer(outline, thickness, stock)
+  local name
+  if outline.operation == 'blind_kerf' then
+    return 'On_' .. outline.layer
+  elseif outline.operation == 'drill' then
+    name = 'DRILL'
+  elseif not outline.closed then
+    name = 'On'
+  elseif outline.hole then
+    name = 'In'
+  else
+    name = 'out'
+  end
+  if thickness and math.abs(thickness-stock) > 0.001 then
+    name = name .. '_T_' .. string.format('%.4g',thickness) .. 'mm'
+  end
+  return name
+end
+
 local function add_vectors(result)
   local job = VectricJob()
   local resized = nil
@@ -240,7 +260,7 @@ local function add_vectors(result)
     end
   end
   local scale = job.InMM and 1 or 1/25.4
-  local prefix = 'SM_' .. os.date('%H%M%S') .. '_' .. tostring(math.random(100,999))
+  local stock = MaterialBlock().Thickness / scale
   local pending = {}
   -- Create all native vectors before attaching them to the job.
   for _,part in ipairs(result.parts) do
@@ -251,8 +271,7 @@ local function add_vectors(result)
       for i=2,#points do
         contour:LineTo(Point2D(job.MinX+points[i][1]*scale, job.MinY+points[i][2]*scale))
       end
-      local layer_name = prefix .. '_' .. part.name .. '_' .. tostring(part.thickness) .. 'mm'
-      if not outline.closed or outline.layer then layer_name = prefix .. '_' .. (outline.layer or 'HINGE_CUTS') end
+      local layer_name = machining_layer(outline,part.thickness,stock)
       pending[#pending+1] = {object=CreateCadContour(contour), layer=layer_name}
     end
   end

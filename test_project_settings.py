@@ -167,6 +167,67 @@ class ProjectSettingsTests(unittest.TestCase):
         self.assertFalse(any('HINGE_CUTS' in name for name in layers))
         self.assertIn('глубина 3.400',l.globals().labels.status)
 
+    def capture_layers(self,result,in_mm=True):
+        l=self.resize_runtime(5000,5000,in_mm=in_mm)
+        l.globals().engine_result=l.execute('return '+lua(result))
+        l.execute('''
+          native_layers={};selected=0
+          function VectricJob() return {Exists=true,InMM=metric,Width=5000,Height=5000,MinX=0,MinY=0,
+            LayerManager={GetLayerWithName=function(self,name)
+              table.insert(native_layers,name);return {AddObject=function() end} end},
+            Selection={Clear=function() end,Add=function() selected=selected+1 end},Refresh2DView=function() end} end
+        ''')
+        l.globals().OnLuaButton_Create(l.globals().dialog)
+        return list(l.globals().native_layers.values()),l.globals().selected
+
+    def test_native_layers_route_all_box_modes_by_machining_side(self):
+        for mode in range(9):
+            with self.subTest(mode=mode):
+                result=build(dict(mode=mode,dMaterial=6,dFreza=4))
+                actual,selected=self.capture_layers(result)
+                expected=[]
+                for part in result['parts']:
+                    for c in part['contours']:
+                        name='On' if not c['closed'] else 'In' if c['hole'] else 'out'
+                        if abs(part['thickness']-6)>.001:name+=f"_T_{part['thickness']:.4g}mm"
+                        expected.append(name)
+                self.assertEqual(actual,expected)
+                self.assertEqual(selected,len(expected))
+                self.assertIn('out',actual)
+
+    def test_native_layers_keep_depth_drilling_and_other_thickness_separate(self):
+        points=[[0,0],[10,0],[10,10],[0,0]]
+        result=dict(ok=True,width=100,height=100,thickness=6,parts=[
+            dict(name='a',thickness=6,contours=[
+                dict(closed=True,hole=False,points=points),
+                dict(closed=True,hole=True,points=points),
+                dict(closed=False,points=points),
+                dict(closed=True,hole=True,operation='drill',layer='CAGE_DRILL',points=points),
+                dict(closed=False,operation='blind_kerf',layer='KERF_INSIDE_DEPTH_5.0000mm_REMAIN_1.0000mm',points=points)]),
+            dict(name='b',thickness=3,contours=[dict(closed=True,hole=False,points=points)])],
+            info=dict(contours=[dict(points=points)]))
+        layers,selected=self.capture_layers(result)
+        self.assertEqual(layers,['out','In','On','DRILL',
+            'On_KERF_INSIDE_DEPTH_5.0000mm_REMAIN_1.0000mm','out_T_3mm','INFO'])
+        self.assertEqual(selected,6)
+        # Stock is .25 inches = 6.35 mm; base layers must use the actual stock units.
+        result['parts'][0]['thickness']=6.35
+        layers,_=self.capture_layers(result,in_mm=False)
+        self.assertEqual(layers[:4],['out','In','On','DRILL'])
+
+    def test_native_cage_drilling_is_not_merged_into_profile_holes(self):
+        result=build(dict(task='cage',dMaterial=6))
+        actual,selected=self.capture_layers(result)
+        expected=[]
+        for part in result['parts']:
+            for c in part['contours']:
+                name='DRILL' if c.get('operation')=='drill' else 'In' if c['hole'] else 'out'
+                if abs(part['thickness']-6)>.001:name+=f"_T_{part['thickness']:.4g}mm"
+                expected.append(name)
+        self.assertTrue(any(name.startswith('DRILL') for name in expected))
+        self.assertEqual(actual,expected)
+        self.assertEqual(selected,len(expected))
+
     def test_missing_job_requires_setup(self):
         l=self.runtime();l.execute('has_job=false')
         self.assertFalse(l.globals().main('unused'))
