@@ -40,4 +40,31 @@ class BoxAssemblyTests(unittest.TestCase):
   self.assertIn('class="LuaButton" id="BoxAssembly"',text)
   self.assertIn("document.getElementById('BoxAssembly').style.display=id==='cage'?'none':''",text)
 
+ def test_raw_uuid_cache_after_create_and_changed_parameters(self):
+  from test_project_settings import ProjectSettingsTests
+  l=ProjectSettingsTests().resize_runtime(5000,5000)
+  l.execute('''
+    saved={}
+    function Registry(name) return {
+      GetString=function(self,k,d) return saved[name..':'..k] or d end,
+      SetString=function(self,k,v) saved[name..':'..k]=v end,
+      SetInt=function() end,SetBool=function() end} end
+  ''')
+  # The fixture's raw UUID raises on tostring, just like Aspire's luabind UUID.
+  original=build(dict(mode=8,dMaterial=6,dFreza=4))
+  l.execute('engine_result='+lua(original))
+  l.globals().OnLuaButton_Create(l.globals().dialog)
+  self.assertEqual(l.globals().saved['ShipoMasterAssembly_1:sheet'],'active-sheet')
+  r=build_box_assembly(original);l.execute('engine_result='+lua(r)+';added=0')
+  l.globals().OnLuaButton_BoxAssembly(l.globals().dialog)
+  self.assertEqual(l.globals().added,len(r['info']['contours']))
+  l.execute("fields.shirina='250';added=0")
+  l.globals().OnLuaButton_BoxAssembly(l.globals().dialog)
+  self.assertEqual(l.globals().added,0)
+  self.assertIn('Параметры изменены',l.globals().last_message)
+  # A different raw UUID must not reuse a cached layout from another sheet.
+  l.execute("raw_sheet.value='another-sheet';last_message=nil")
+  l.globals().OnLuaButton_BoxAssembly(l.globals().dialog)
+  self.assertEqual(l.globals().added,len(r['info']['contours']))
+
 if __name__=='__main__':unittest.main()

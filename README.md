@@ -2,12 +2,12 @@
 
 Гаджет для **Vectric Aspire 12.5 под Windows x64**: шипованные ящики, перегородки, гибкие прорези, изогнутые крышки и клетка с разборным алюминиевым каркасом.
 
-**Текущая версия: 1.5.6.** Проверено в Aspire **12.504**. Совместимость с другими версиями Aspire и с VCarve не проверялась.
+**Текущая версия: 1.5.7.** Проверено в Aspire **12.504**. Совместимость с другими версиями Aspire и с VCarve не проверялась.
 
 ## Скачать и установить
 
 1. Откройте [последний релиз](https://github.com/i-strannik-i/ShipoMaster-Aspire/releases/latest).
-2. В разделе **Assets** скачайте **`ShipoMaster_Aspire_1.5.6.vgadget`**. Архивы **Source code** предназначены для разработчиков.
+2. В разделе **Assets** скачайте **`ShipoMaster_Aspire_1.5.7.vgadget`**. Архивы **Source code** предназначены для разработчиков.
 3. В Aspire выберите **Gadgets → Install New Gadget…** и укажите скачанный `.vgadget`.
 4. Создайте или откройте проект и задайте толщину материала в **Job Setup → Thickness (Z)**.
 5. Запустите **Gadgets → ShipoMaster Aspire → ShipoMaster Aspire**. Если пункт не появился, закройте и снова откройте Aspire.
@@ -64,7 +64,7 @@ node test_dialog_ui.js
 .venv\Scripts\python package_gadget.py
 ```
 
-Готовый файл появится в корне проекта: `ShipoMaster_Aspire_1.5.6.vgadget`. Флаг `--install` у `package_gadget.py` дополнительно копирует пакет в общую папку гаджетов Aspire 12.5. Для смены версии используется `bump_version.py`.
+Готовый файл появится в корне проекта: `ShipoMaster_Aspire_1.5.7.vgadget`. Флаг `--install` у `package_gadget.py` дополнительно копирует пакет в общую папку гаджетов Aspire 12.5. Для смены версии используется `bump_version.py`.
 
 Результаты проверок и сведения о проверках в Aspire: [VERIFICATION_RU.txt](VERIFICATION_RU.txt).
 

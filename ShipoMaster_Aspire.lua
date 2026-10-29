@@ -1,8 +1,8 @@
 -- VECTRIC LUA SCRIPT
--- ShipoMaster Aspire 1.5.6 / Aspire 12.5
+-- ShipoMaster Aspire 1.5.7 / Aspire 12.5
 -- Geometry provenance is documented in README_RU.txt and the engine sources.
 
-local VERSION = '1.5.6'
+local VERSION = '1.5.7'
 local TITLE = 'ШипоМастер Aspire ' .. VERSION
 local script_dir = ''
 local number_defaults = {
@@ -304,17 +304,23 @@ local function box_signature(o)
   end
   return table.concat(values,'|')
 end
+local function active_sheet_key(job)
+  -- ActiveSheetId is a raw SDK UUID: luabind does not define tostring for it.
+  local id=luaUUID()
+  id:SetId(job.SheetManager.ActiveSheetId)
+  return id:AsString()
+end
 local function remember_box_layout(result,o)
   local job=VectricJob();if not job.SheetManager then return end
   local reg=Registry('ShipoMasterAssembly_1')
-  reg:SetString('sheet',tostring(job.SheetManager.ActiveSheetId))
+  reg:SetString('sheet',active_sheet_key(job))
   reg:SetString('signature',box_signature(o))
   for k,v in pairs({x=job.MinX,y=job.MinY,width=result.width,height=result.height}) do reg:SetString(k,tostring(v)) end
 end
 function OnLuaButton_BoxAssembly(dialog)
   local o=read_fields(dialog);if not o then return true end
   local job=VectricJob();local reg=Registry('ShipoMasterAssembly_1')
-  local same_sheet=reg:GetString('sheet','')==tostring(job.SheetManager.ActiveSheetId)
+  local same_sheet=reg:GetString('sheet','')==active_sheet_key(job)
   if same_sheet and reg:GetString('signature','')~=box_signature(o) then
     MessageBox('Параметры изменены после создания деталей. Сначала создайте новую раскладку, затем сборочный чертёж.');return true
   end

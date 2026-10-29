@@ -11,7 +11,8 @@ class ProjectSettingsTests(unittest.TestCase):
         l.globals().fail_resize=fail
         l.execute('''
         resize_calls=0;added=0;points={};existing={x=123,y=456,size=17}
-        sheets={ActiveSheetId='active-sheet',ResizeSheet=function(self,id,w,h,t,scale)
+        raw_sheet=setmetatable({value='active-sheet'},{__tostring=function() error('No such operator defined') end})
+        sheets={ActiveSheetId=raw_sheet,ResizeSheet=function(self,id,w,h,t,scale)
           resize_calls=resize_calls+1
           resize_args={id=id,width=w,height=h,thickness=t,scale=scale}
           if not fail_resize then sheet_width=w;sheet_height=h end
@@ -36,7 +37,7 @@ class ProjectSettingsTests(unittest.TestCase):
             l=self.resize_runtime(2050*scale,3050*scale,in_mm=metric)
             l.globals().OnLuaButton_Create(l.globals().dialog)
             args=l.globals().resize_args
-            self.assertEqual(args.id,'active-sheet')
+            self.assertEqual(args.id.value,'active-sheet')
             self.assertAlmostEqual(args.width,6050*scale)
             self.assertAlmostEqual(args.height,3540*scale)
             self.assertEqual(args.thickness,6 if metric else .25)
@@ -73,6 +74,9 @@ class ProjectSettingsTests(unittest.TestCase):
         fields={};checks={};labels={};lists={};has_job=true
         function VectricJob() return {Exists=has_job} end
         function MaterialBlock() return {Thickness=stock,InMM=metric} end
+        function luaUUID() return {
+          SetId=function(self,id) self.value=id.value end,
+          AsString=function(self) return self.value end} end
         function GetAppVersion() return 12.504 end
         function MessageBox(s) last_message=s end
         function Registry() return {
