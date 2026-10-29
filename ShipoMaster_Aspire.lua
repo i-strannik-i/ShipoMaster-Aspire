@@ -1,8 +1,8 @@
 -- VECTRIC LUA SCRIPT
--- ShipoMaster Aspire 1.5.8 / Aspire 12.5
+-- ShipoMaster Aspire 1.5.9 / Aspire 12.5
 -- Geometry provenance is documented in README_RU.txt and the engine sources.
 
-local VERSION = '1.5.8'
+local VERSION = '1.5.9'
 local TITLE = 'ШипоМастер Aspire ' .. VERSION
 local script_dir = ''
 local settings_saved = false
@@ -400,7 +400,7 @@ function OnLuaButton_Create(dialog)
     local c=result.roof.kerf
     status=status..string.format(' НЕСКВОЗНО с внутренней стороны: глубина %.3f мм, остаток %.3f мм; %d пропилов, шаг %.3f мм.',c.depth,c.remaining,c.count,c.pitch)
   end
-  if result.info then status=status..' Подписи и таблица: слой INFO (не фрезеровать).' end
+  if result.info then status=status..' Номера деталей: слой INFO (не фрезеровать).' end
   if result.roof then status=status..string.format(' Крышка: %.1f × %.1f мм; подъём %.1f мм.',result.roof.panel_length,result.roof.developed_length,result.roof.rise) end
   dialog:UpdateLabelField('status',status)
   return true

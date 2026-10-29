@@ -1,6 +1,6 @@
 import unittest
 from copy import deepcopy
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon,Point
 from geometry_worker import build,lua
 from layout_info import add_info
 
@@ -13,7 +13,16 @@ class InfoTests(unittest.TestCase):
     self.assertEqual(r['info']['layer'],'INFO');self.assertGreaterEqual(r['info']['paper_text_height'],2.5)
     for c in r['info']['contours']:
      for x,y in c['points']:self.assertTrue(0<=x<=r['width'] and 0<=y<=r['height'])
- def test_existing_large_job_keeps_legend_text_readable_on_a4(self):
+ def test_box_marks_do_not_add_a_second_table_or_grow_the_layout(self):
+  for mode in range(9):
+   r=build(dict(mode=mode,dMaterial=4,dFreza=3));size=(r['width'],r['height']);add_info(r)
+   self.assertEqual((r['width'],r['height']),size)
+   self.assertEqual([c['text'] for c in r['info']['labels']],[p['name'].split('_')[0] for p in r['parts']])
+   for part,label in zip(r['parts'],r['info']['labels']):
+    from layout_info import part_shape
+    shape=part_shape(part)
+    self.assertTrue(shape.covers(Point(label['x'],label['y'])))
+ def test_existing_large_job_keeps_nominal_part_mark_size_on_a4(self):
   r=add_info(build({'mode':0,'dMaterial':4,'dFreza':4}),2050,3050)
   actual_scale=min(190/max(2050,r['width']),277/max(3050,r['height']))
   self.assertGreaterEqual(r['info']['paper_text_height']*actual_scale/r['info']['a4_scale'],2.5)

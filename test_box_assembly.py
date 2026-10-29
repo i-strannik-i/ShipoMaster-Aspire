@@ -10,11 +10,19 @@ class BoxAssemblyTests(unittest.TestCase):
     original=build({'mode':mode,'roof_mount':mount,'dMaterial':4,'dFreza':4})
     r=build_box_assembly(original);self.assertEqual(r['parts'],[]);self.assertTrue(r['info']['assembly'])
     self.assertEqual(r['info']['source_parts'],[p['name'] for p in original['parts']])
-    self.assertEqual([c['part'] for c in r['info']['callouts']],r['info']['source_parts'])
+    self.assertEqual([part for c in r['info']['callouts'] for part in c['parts']],r['info']['source_parts'])
+    self.assertEqual([v['name'] for v in r['info']['views']],['top','side','front','bottom','isometric'])
+    self.assertTrue(all(v['part_ids'] for v in r['info']['views']))
     for c in r['info']['callouts']:
      self.assertIn(c['id'],r['info']['texts'])
      for key in ('anchor','label_position'):
       x,y=c[key];self.assertTrue(0<=x<=r['width'] and 0<=y<=r['height'])
+    from shapely.geometry import LineString,box
+    leaders=[LineString(c['leader']) for c in r['info']['callouts']]
+    for i,line in enumerate(leaders):
+     for j,other in enumerate(leaders[:i]):self.assertFalse(line.intersects(other),(mode,i,j))
+     for j,c in enumerate(r['info']['callouts']):
+      if j!=i:self.assertFalse(line.intersects(box(*c['label_bounds'])),(mode,i,j))
     for c in r['info']['contours']:
      for x,y in c['points']:self.assertTrue(-.001<=x<=r['width']+.001 and -.001<=y<=r['height']+.001,(mode,x,y,r['width'],r['height']))
  def test_native_adds_only_info_and_preserves_existing_objects_and_selection(self):
@@ -44,6 +52,11 @@ class BoxAssemblyTests(unittest.TestCase):
   text=Path('ShipoMaster_Aspire.html').read_text('utf-8')
   self.assertIn('class="LuaButton" id="BoxAssembly"',text)
   self.assertIn("document.getElementById('BoxAssembly').style.display=id==='cage'?'none':''",text)
+
+ def test_overlay_side_height_matches_the_actual_cut_end(self):
+  r=build_box_assembly(build(dict(mode=8,roof_mount=1,shirina=200,dlinna=300,visota=100,dMaterial=6,dFreza=3)))
+  self.assertIn('214.9',r['info']['texts'])
+  self.assertNotIn('215.4',r['info']['texts'])
 
  def test_raw_uuid_cache_after_create_and_changed_parameters(self):
   from test_project_settings import ProjectSettingsTests

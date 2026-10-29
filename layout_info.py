@@ -50,6 +50,25 @@ def part_shape(part):
 
 def add_info(result,sheet_width=0,sheet_height=0):
  if not result.get('parts'):return result
+ if not result.get('cage'):
+  # Box dimensions and names belong to the assembly sheet; retain only locators.
+  scale=min(190/max(result['width'],sheet_width),277/max(result['height'],sheet_height))
+  contours=[];labels=[];hpaper=2.6
+  for part in result['parts']:
+   shape=part_shape(part);x0,y0,x1,y1=shape.bounds;ident=part['name'].split('_')[0]
+   h=min(hpaper/scale,(x1-x0)*.7/max(width(ident,1),1),(y1-y0)*.35)
+   anchor=shape.representative_point()
+   for _ in range(12):
+    x=anchor.x-width(ident,h)/2;y=anchor.y-h/2
+    if shape.covers(box(x,y,x+width(ident,h),y+h)):break
+    h*=.8
+   x=anchor.x-width(ident,h)/2;y=anchor.y-h/2
+   contours+=text_contours(ident,x,y,h)
+   labels.append(dict(part=part['name'],text=ident,x=x,y=y,height=h))
+  result['cut_width']=result['width'];result['cut_height']=result['height']
+  result['info']=dict(layer='INFO',contours=contours,labels=labels,paper_text_height=hpaper,
+      a4_scale=scale,note='Только номера деталей. Перечень и размеры — на сборочном чертеже. INFO не фрезеровать.')
+  return result
  rows=[]
  for part in result['parts']:
   shape=part_shape(part);x0,y0,x1,y1=shape.bounds;ident=part['name'].split('_')[0]
